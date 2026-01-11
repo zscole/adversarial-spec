@@ -533,6 +533,36 @@ Use cases:
 - Include design documents or prior specs for consistency
 - Include compliance requirements documents
 
+### Preserve Intent Mode
+
+Convergence can collapse toward lowest-common-denominator interpretations, sanding off novel design choices. The `--preserve-intent` flag makes removals expensive:
+
+```bash
+python3 debate.py critique --models gpt-4o --preserve-intent --doc-type tech <<'SPEC_EOF'
+<spec here>
+SPEC_EOF
+```
+
+When enabled, models must:
+
+1. **Quote exactly** what they want to remove or substantially change
+2. **Justify the harm** - not just "unnecessary" but what concrete problem it causes
+3. **Distinguish error from preference**:
+   - ERRORS: Factually wrong, contradictory, or technically broken (remove/fix)
+   - RISKS: Security holes, scalability issues, missing error handling (flag)
+   - PREFERENCES: Different style, structure, or approach (DO NOT remove)
+4. **Ask before removing** unusual but functional choices
+
+This shifts the default from "sand off anything unusual" to "add protective detail while preserving distinctive choices."
+
+**Use when:**
+- Your spec contains intentional unconventional choices
+- You want models to challenge your ideas, not homogenize them
+- Previous rounds removed things you wanted to keep
+- You're refining an existing spec that represents deliberate decisions
+
+Can be combined with other flags: `--preserve-intent --focus security`
+
 ### Cost Tracking
 
 Every critique round displays token usage and estimated cost:
@@ -637,6 +667,7 @@ python3 debate.py send-final --models MODEL_LIST --doc-type TYPE --rounds N < sp
 - `--persona` - Professional persona for critique
 - `--context, -c` - Context file (can be used multiple times)
 - `--profile` - Load settings from saved profile
+- `--preserve-intent` - Require explicit justification for any removal
 - `--press, -p` - Anti-laziness check for early agreement
 - `--telegram, -t` - Enable Telegram notifications
 - `--poll-timeout` - Telegram reply timeout in seconds (default: 60)

@@ -226,6 +226,28 @@ Use cases:
 - Design documents or prior specs for consistency
 - Compliance requirements documents
 
+### Preserve Intent Mode
+
+Convergence can sand off novel ideas when models interpret "unusual" as "wrong". The `--preserve-intent` flag makes removal expensive:
+
+```bash
+--preserve-intent
+```
+
+When enabled, models must:
+
+1. **Quote exactly** what they want to remove or substantially change
+2. **Justify the harm** - not just "unnecessary" but what concrete problem it causes
+3. **Distinguish error from preference** - only remove things that are factually wrong, contradictory, or risky
+4. **Ask before removing** unusual but functional choices: "Was this intentional?"
+
+This shifts the default from "sand off anything unusual" to "add protective detail while preserving distinctive choices."
+
+Use when:
+- Your spec contains intentional unconventional choices
+- You want models to challenge your ideas, not homogenize them
+- Previous rounds removed things you wanted to keep
+
 ### Cost Tracking
 
 Every critique round displays token usage and estimated cost:
@@ -344,6 +366,7 @@ debate.py save-profile NAME --models ... [--focus ...] [--persona ...]
 - `--persona` - Professional persona
 - `--context, -c` - Context file (repeatable)
 - `--profile` - Load saved profile
+- `--preserve-intent` - Require justification for removals
 - `--press, -p` - Anti-laziness check
 - `--telegram, -t` - Enable Telegram
 - `--json, -j` - JSON output

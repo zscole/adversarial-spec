@@ -10,6 +10,7 @@ Usage:
     echo "spec" | python3 debate.py critique --models gpt-4o --persona "security engineer"
     echo "spec" | python3 debate.py critique --models gpt-4o --context ./api.md --context ./schema.sql
     echo "spec" | python3 debate.py critique --models gpt-4o --profile strict-security
+    echo "spec" | python3 debate.py critique --models gpt-4o --preserve-intent
     echo "spec" | python3 debate.py diff --previous prev.md --current current.md
     echo "spec" | python3 debate.py export-tasks --doc-type prd
     python3 debate.py providers
@@ -75,6 +76,30 @@ MODEL_COSTS = {
 DEFAULT_COST = {"input": 5.00, "output": 15.00}
 
 PROFILES_DIR = Path.home() / ".config" / "adversarial-spec" / "profiles"
+
+PRESERVE_INTENT_PROMPT = """
+**PRESERVE ORIGINAL INTENT**
+This document represents deliberate design choices. Before suggesting ANY removal or substantial modification:
+
+1. ASSUME the author had good reasons for including each element
+2. For EVERY removal or substantial change you propose, you MUST:
+   - Quote the exact text you want to remove/change
+   - Explain what problem it causes (not just "unnecessary" or "could be simpler")
+   - Describe the concrete harm if it remains vs the benefit of removal
+   - Consider: Is this genuinely wrong, or just different from what you'd write?
+
+3. Distinguish between:
+   - ERRORS: Factually wrong, contradictory, or technically broken (remove/fix these)
+   - RISKS: Security holes, scalability issues, missing error handling (flag these)
+   - PREFERENCES: Different style, structure, or approach (DO NOT remove these)
+
+4. If something seems unusual but isn't broken, ASK about it rather than removing it:
+   "The spec includes X which is unconventional. Was this intentional? If so, consider documenting the rationale."
+
+5. Your critique should ADD protective detail, not sand off distinctive choices.
+
+Treat removal like a code review: additions are cheap, deletions require justification.
+"""
 
 FOCUS_AREAS = {
     "security": """
@@ -479,10 +504,12 @@ def list_profiles():
             models = config.get("models", "not set")
             focus = config.get("focus", "none")
             persona = config.get("persona", "none")
+            preserve = "yes" if config.get("preserve_intent") else "no"
             print(f"  {name}")
             print(f"    models: {models}")
             print(f"    focus: {focus}")
             print(f"    persona: {persona}")
+            print(f"    preserve-intent: {preserve}")
             print()
         except Exception:
             print(f"  {p.stem} [error reading]")
@@ -496,7 +523,8 @@ def call_single_model(
     press: bool = False,
     focus: Optional[str] = None,
     persona: Optional[str] = None,
-    context: Optional[str] = None
+    context: Optional[str] = None,
+    preserve_intent: bool = False
 ) -> ModelResponse:
     """Send spec to a single model and return response."""
     system_prompt = get_system_prompt(doc_type, persona)
@@ -507,6 +535,9 @@ def call_single_model(
         focus_section = FOCUS_AREAS[focus.lower()]
     elif focus:
         focus_section = f"**CRITICAL FOCUS: {focus.upper()}**\nPrioritize analysis of {focus} concerns above all else."
+
+    if preserve_intent:
+        focus_section = PRESERVE_INTENT_PROMPT + "\n\n" + focus_section
 
     context_section = context if context else ""
 
@@ -559,14 +590,15 @@ def call_models_parallel(
     press: bool = False,
     focus: Optional[str] = None,
     persona: Optional[str] = None,
-    context: Optional[str] = None
+    context: Optional[str] = None,
+    preserve_intent: bool = False
 ) -> list[ModelResponse]:
     """Call multiple models in parallel and collect responses."""
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(models)) as executor:
         future_to_model = {
             executor.submit(
-                call_single_model, model, spec, round_num, doc_type, press, focus, persona, context
+                call_single_model, model, spec, round_num, doc_type, press, focus, persona, context, preserve_intent
             ): model
             for model in models
         }
@@ -846,6 +878,8 @@ Document types:
                         help="Current spec file (for diff action)")
     parser.add_argument("--show-cost", action="store_true",
                         help="Show cost summary after critique")
+    parser.add_argument("--preserve-intent", action="store_true",
+                        help="Require explicit justification for any removal or substantial modification")
     args = parser.parse_args()
 
     # Handle simple info commands
@@ -875,6 +909,7 @@ Document types:
             "focus": args.focus,
             "persona": args.persona,
             "context": args.context,
+            "preserve_intent": args.preserve_intent,
         }
         save_profile(args.profile_name, config)
         return
@@ -909,6 +944,8 @@ Document types:
             args.persona = profile["persona"]
         if "context" in profile and not args.context:
             args.context = profile["context"]
+        if profile.get("preserve_intent") and not args.preserve_intent:
+            args.preserve_intent = profile["preserve_intent"]
 
     # Parse models list
     models = [m.strip() for m in args.models.split(",") if m.strip()]
@@ -975,11 +1012,12 @@ Document types:
     mode = "pressing for confirmation" if args.press else "critiquing"
     focus_info = f" (focus: {args.focus})" if args.focus else ""
     persona_info = f" (persona: {args.persona})" if args.persona else ""
-    print(f"Calling {len(models)} model(s) ({mode}){focus_info}{persona_info}: {', '.join(models)}...", file=sys.stderr)
+    preserve_info = " (preserve-intent)" if args.preserve_intent else ""
+    print(f"Calling {len(models)} model(s) ({mode}){focus_info}{persona_info}{preserve_info}: {', '.join(models)}...", file=sys.stderr)
 
     results = call_models_parallel(
         models, spec, args.round, args.doc_type, args.press,
-        args.focus, args.persona, context
+        args.focus, args.persona, context, args.preserve_intent
     )
 
     errors = [r for r in results if r.error]
@@ -1003,6 +1041,7 @@ Document types:
             "models": models,
             "focus": args.focus,
             "persona": args.persona,
+            "preserve_intent": args.preserve_intent,
             "results": [
                 {
                     "model": r.model,
