@@ -26,6 +26,12 @@ Generate and refine specifications through iterative debate with multiple LLMs u
 | Mistral   | `MISTRAL_API_KEY`    | `mistral/mistral-large`, `mistral/codestral`|
 | Groq      | `GROQ_API_KEY`       | `groq/llama-3.3-70b-versatile`              |
 | Deepseek  | `DEEPSEEK_API_KEY`   | `deepseek/deepseek-chat`                    |
+| Codex CLI | (ChatGPT subscription) | `codex/gpt-5.2-codex`, `codex/gpt-5.1-codex-max` |
+
+**Codex CLI Setup:**
+- Install: `npm install -g @openai/codex && codex login`
+- Reasoning effort: `--codex-reasoning` (minimal, low, medium, high, xhigh)
+- Web search: `--codex-search` (enables web search for current information)
 
 Run `python3 ~/.claude/skills/adversarial-spec/scripts/debate.py providers` to see which keys are set.
 
@@ -734,3 +740,4 @@ python3 debate.py send-final --models MODEL_LIST --doc-type TYPE --rounds N < sp
 - `--telegram, -t` - Enable Telegram notifications
 - `--poll-timeout` - Telegram reply timeout in seconds (default: 60)
 - `--json, -j` - Output as JSON
+- `--codex-search` - Enable web search for Codex CLI models (allows researching current info)

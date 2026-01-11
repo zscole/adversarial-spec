@@ -603,7 +603,8 @@ def call_codex_model(
     user_message: str,
     model: str,
     reasoning_effort: str = DEFAULT_CODEX_REASONING,
-    timeout: int = 300
+    timeout: int = 300,
+    search: bool = False
 ) -> tuple[str, int, int]:
     """
     Call Codex CLI in headless mode using ChatGPT subscription.
@@ -614,6 +615,7 @@ def call_codex_model(
         model: Model name (e.g., "codex/gpt-5.2-codex" -> uses "gpt-5.2-codex")
         reasoning_effort: Thinking level (minimal, low, medium, high, xhigh). Default: xhigh
         timeout: Timeout in seconds (default 5 minutes)
+        search: Enable web search capability for Codex
 
     Returns:
         Tuple of (response_text, input_tokens, output_tokens)
@@ -637,15 +639,19 @@ USER REQUEST:
 
     try:
         # Run codex exec with JSON output and reasoning effort
+        cmd = [
+            "codex", "exec",
+            "--json",
+            "--full-auto",
+            "--model", actual_model,
+            "-c", f'model_reasoning_effort="{reasoning_effort}"',
+        ]
+        if search:
+            cmd.append("--search")
+        cmd.append(full_prompt)
+
         result = subprocess.run(
-            [
-                "codex", "exec",
-                "--json",
-                "--full-auto",
-                "--model", actual_model,
-                "-c", f'model_reasoning_effort="{reasoning_effort}"',
-                full_prompt
-            ],
+            cmd,
             capture_output=True,
             text=True,
             timeout=timeout
@@ -702,7 +708,8 @@ def call_single_model(
     persona: Optional[str] = None,
     context: Optional[str] = None,
     preserve_intent: bool = False,
-    codex_reasoning: str = DEFAULT_CODEX_REASONING
+    codex_reasoning: str = DEFAULT_CODEX_REASONING,
+    codex_search: bool = False
 ) -> ModelResponse:
     """Send spec to a single model and return response with retry on failure."""
     system_prompt = get_system_prompt(doc_type, persona)
@@ -737,7 +744,8 @@ def call_single_model(
                     system_prompt=system_prompt,
                     user_message=user_message,
                     model=model,
-                    reasoning_effort=codex_reasoning
+                    reasoning_effort=codex_reasoning,
+                    search=codex_search
                 )
                 agreed = "[AGREE]" in content
                 extracted = extract_spec(content)
@@ -823,14 +831,15 @@ def call_models_parallel(
     persona: Optional[str] = None,
     context: Optional[str] = None,
     preserve_intent: bool = False,
-    codex_reasoning: str = DEFAULT_CODEX_REASONING
+    codex_reasoning: str = DEFAULT_CODEX_REASONING,
+    codex_search: bool = False
 ) -> list[ModelResponse]:
     """Call multiple models in parallel and collect responses."""
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(models)) as executor:
         future_to_model = {
             executor.submit(
-                call_single_model, model, spec, round_num, doc_type, press, focus, persona, context, preserve_intent, codex_reasoning
+                call_single_model, model, spec, round_num, doc_type, press, focus, persona, context, preserve_intent, codex_reasoning, codex_search
             ): model
             for model in models
         }
@@ -1127,6 +1136,8 @@ Document types:
                         help="Session ID for state persistence (enables checkpointing and resume)")
     parser.add_argument("--resume",
                         help="Resume a previous session by ID")
+    parser.add_argument("--codex-search", action="store_true",
+                        help="Enable web search for Codex CLI models")
     args = parser.parse_args()
 
     # Handle simple info commands
@@ -1313,12 +1324,13 @@ Document types:
     focus_info = f" (focus: {args.focus})" if args.focus else ""
     persona_info = f" (persona: {args.persona})" if args.persona else ""
     preserve_info = " (preserve-intent)" if args.preserve_intent else ""
-    print(f"Calling {len(models)} model(s) ({mode}){focus_info}{persona_info}{preserve_info}: {', '.join(models)}...", file=sys.stderr)
+    search_info = " (search)" if args.codex_search else ""
+    print(f"Calling {len(models)} model(s) ({mode}){focus_info}{persona_info}{preserve_info}{search_info}: {', '.join(models)}...", file=sys.stderr)
 
     results = call_models_parallel(
         models, spec, args.round, args.doc_type, args.press,
         args.focus, args.persona, context, args.preserve_intent,
-        args.codex_reasoning
+        args.codex_reasoning, args.codex_search
     )
 
     errors = [r for r in results if r.error]
