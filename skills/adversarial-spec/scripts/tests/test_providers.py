@@ -733,6 +733,31 @@ class TestGetAvailableProviders:
                 if name == "OpenAI":
                     assert model == "gpt-4o"
 
+    def test_includes_codex_cli_when_available(self):
+        from providers import get_available_providers
+
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("providers.CODEX_AVAILABLE", True):
+                with patch("providers.GEMINI_CLI_AVAILABLE", False):
+                    available = get_available_providers()
+                    provider_names = [name for name, _, _ in available]
+                    assert "Codex CLI" in provider_names
+
+    def test_includes_gemini_cli_when_available(self):
+        from providers import get_available_providers
+
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("providers.CODEX_AVAILABLE", False):
+                with patch("providers.GEMINI_CLI_AVAILABLE", True):
+                    available = get_available_providers()
+                    provider_names = [name for name, _, _ in available]
+                    assert "Gemini CLI" in provider_names
+                    # Verify the default model for Gemini CLI
+                    for name, key, model in available:
+                        if name == "Gemini CLI":
+                            assert model == "gemini-cli/gemini-3-pro-preview"
+                            assert key is None  # No API key required
+
 
 class TestGetDefaultModel:
     def test_returns_first_available_model(self):
@@ -747,8 +772,9 @@ class TestGetDefaultModel:
 
         with patch.dict("os.environ", {}, clear=True):
             with patch("providers.CODEX_AVAILABLE", False):
-                default = get_default_model()
-                assert default is None
+                with patch("providers.GEMINI_CLI_AVAILABLE", False):
+                    default = get_default_model()
+                    assert default is None
 
     def test_prefers_bedrock_when_enabled(self):
         from providers import get_default_model
@@ -810,6 +836,23 @@ class TestValidateModelCredentials:
             valid, invalid = validate_model_credentials(["codex/gpt-5.2-codex"])
             assert valid == []
             assert invalid == ["codex/gpt-5.2-codex"]
+
+    def test_validates_gemini_cli_availability(self):
+        from providers import validate_model_credentials
+
+        with patch("providers.GEMINI_CLI_AVAILABLE", True):
+            valid, invalid = validate_model_credentials(
+                ["gemini-cli/gemini-3-pro-preview"]
+            )
+            assert valid == ["gemini-cli/gemini-3-pro-preview"]
+            assert invalid == []
+
+        with patch("providers.GEMINI_CLI_AVAILABLE", False):
+            valid, invalid = validate_model_credentials(
+                ["gemini-cli/gemini-3-pro-preview"]
+            )
+            assert valid == []
+            assert invalid == ["gemini-cli/gemini-3-pro-preview"]
 
     def test_defers_to_bedrock_validation_when_enabled(self):
         from providers import validate_model_credentials

@@ -13,7 +13,9 @@ Generate and refine specifications through iterative debate with multiple LLMs u
 ## Requirements
 
 - Python 3.10+ with `litellm` package installed
-- API key for at least one provider (set via environment variable), OR AWS Bedrock configured
+- API key for at least one provider (set via environment variable), OR AWS Bedrock configured, OR CLI tools (codex, gemini) installed
+
+**IMPORTANT: Do NOT install the `llm` package (Simon Willison's tool).** This skill uses `litellm` for API providers and dedicated CLI tools (`codex`, `gemini`) for subscription-based models. Installing `llm` is unnecessary and may cause confusion.
 
 ## Supported Providers
 
@@ -29,11 +31,17 @@ Generate and refine specifications through iterative debate with multiple LLMs u
 | Deepseek   | `DEEPSEEK_API_KEY`     | `deepseek/deepseek-chat`                    |
 | Zhipu      | `ZHIPUAI_API_KEY`      | `zhipu/glm-4`, `zhipu/glm-4-plus`           |
 | Codex CLI  | (ChatGPT subscription) | `codex/gpt-5.2-codex`, `codex/gpt-5.1-codex-max` |
+| Gemini CLI | (Google account)       | `gemini-cli/gemini-3-pro-preview`, `gemini-cli/gemini-3-flash-preview` |
 
 **Codex CLI Setup:**
 - Install: `npm install -g @openai/codex && codex login`
 - Reasoning effort: `--codex-reasoning` (minimal, low, medium, high, xhigh)
 - Web search: `--codex-search` (enables web search for current information)
+
+**Gemini CLI Setup:**
+- Install: `npm install -g @google/gemini-cli && gemini auth`
+- Models: `gemini-3-pro-preview`, `gemini-3-flash-preview`
+- No API key needed - uses Google account authentication
 
 Run `python3 ~/.claude/skills/adversarial-spec/scripts/debate.py providers` to see which keys are set.
 
@@ -330,6 +338,13 @@ Then present available models to the user using AskUserQuestion with multiSelect
 **If ZHIPUAI_API_KEY is set, include:**
 - `zhipu/glm-4` - Chinese language model
 - `zhipu/glm-4-plus` - Enhanced GLM model
+
+**If Codex CLI is installed, include:**
+- `codex/gpt-5.2-codex` - OpenAI Codex with extended reasoning
+
+**If Gemini CLI is installed, include:**
+- `gemini-cli/gemini-3-pro-preview` - Google Gemini 3 Pro
+- `gemini-cli/gemini-3-flash-preview` - Google Gemini 3 Flash
 
 Use AskUserQuestion like this:
 ```

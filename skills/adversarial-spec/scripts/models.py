@@ -37,6 +37,7 @@ from prompts import (
 )
 from providers import (
     CODEX_AVAILABLE,
+    GEMINI_CLI_AVAILABLE,
     DEFAULT_CODEX_REASONING,
     DEFAULT_COST,
     MODEL_COSTS,
@@ -368,6 +369,88 @@ USER REQUEST:
         raise RuntimeError("Codex CLI not found in PATH")
 
 
+def call_gemini_cli_model(
+    system_prompt: str,
+    user_message: str,
+    model: str,
+    timeout: int = 600,
+) -> tuple[str, int, int]:
+    """
+    Call Gemini CLI for model inference using Google account authentication.
+
+    Args:
+        system_prompt: System instructions for the model
+        user_message: User prompt to send
+        model: Model name (e.g., "gemini-cli/gemini-3-pro-preview" -> uses "gemini-3-pro-preview")
+        timeout: Timeout in seconds (default 10 minutes)
+
+    Returns:
+        Tuple of (response_text, input_tokens, output_tokens)
+        Note: Gemini CLI doesn't report token usage, so tokens are estimated.
+
+    Raises:
+        RuntimeError: If Gemini CLI is not available or fails
+    """
+    if not GEMINI_CLI_AVAILABLE:
+        raise RuntimeError(
+            "Gemini CLI not found. Install with: npm install -g @google/gemini-cli"
+        )
+
+    # Extract actual model name from "gemini-cli/model" format
+    actual_model = model.split("/", 1)[1] if "/" in model else model
+
+    # Combine system prompt and user message
+    full_prompt = f"""SYSTEM INSTRUCTIONS:
+{system_prompt}
+
+USER REQUEST:
+{user_message}"""
+
+    try:
+        # Use gemini CLI with the prompt passed via stdin and -p flag
+        cmd = ["gemini", "-m", actual_model, "-y"]  # -y for auto-approve (no tool calls expected)
+
+        result = subprocess.run(
+            cmd,
+            input=full_prompt,
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+
+        if result.returncode != 0:
+            error_msg = (
+                result.stderr.strip() or f"Gemini CLI exited with code {result.returncode}"
+            )
+            raise RuntimeError(f"Gemini CLI failed: {error_msg}")
+
+        response_text = result.stdout.strip()
+
+        # Filter out noise lines from gemini CLI output
+        lines = response_text.split('\n')
+        filtered_lines = []
+        skip_prefixes = ('Loaded cached', 'Server ', 'Loading extension')
+        for line in lines:
+            if not any(line.startswith(prefix) for prefix in skip_prefixes):
+                filtered_lines.append(line)
+        response_text = '\n'.join(filtered_lines).strip()
+
+        if not response_text:
+            raise RuntimeError("No response from Gemini CLI")
+
+        # Estimate tokens (Gemini CLI doesn't report actual usage)
+        # Rough estimate: 4 chars per token
+        input_tokens = len(full_prompt) // 4
+        output_tokens = len(response_text) // 4
+
+        return response_text, input_tokens, output_tokens
+
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"Gemini CLI timed out after {timeout}s")
+    except FileNotFoundError:
+        raise RuntimeError("Gemini CLI not found in PATH")
+
+
 def call_single_model(
     model: str,
     spec: str,
@@ -428,6 +511,56 @@ def call_single_model(
                     reasoning_effort=codex_reasoning,
                     timeout=timeout,
                     search=codex_search,
+                )
+                agreed = "[AGREE]" in content
+                extracted = extract_spec(content)
+
+                if not agreed and not extracted:
+                    print(
+                        f"Warning: {model} provided critique but no [SPEC] tags found. Response may be malformed.",
+                        file=sys.stderr,
+                    )
+
+                cost = cost_tracker.add(model, input_tokens, output_tokens)
+
+                return ModelResponse(
+                    model=model,
+                    response=content,
+                    agreed=agreed,
+                    spec=extracted,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    cost=cost,
+                )
+            except Exception as e:
+                last_error = str(e)
+                if attempt < MAX_RETRIES - 1:
+                    delay = RETRY_BASE_DELAY * (2**attempt)
+                    print(
+                        f"Warning: {model} failed (attempt {attempt + 1}/{MAX_RETRIES}): {last_error}. Retrying in {delay:.1f}s...",
+                        file=sys.stderr,
+                    )
+                    time.sleep(delay)
+                else:
+                    print(
+                        f"Error: {model} failed after {MAX_RETRIES} attempts: {last_error}",
+                        file=sys.stderr,
+                    )
+
+        return ModelResponse(
+            model=model, response="", agreed=False, spec=None, error=last_error
+        )
+
+    # Route Gemini CLI models to dedicated handler
+    if model.startswith("gemini-cli/"):
+        last_error = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                content, input_tokens, output_tokens = call_gemini_cli_model(
+                    system_prompt=system_prompt,
+                    user_message=user_message,
+                    model=model,
+                    timeout=timeout,
                 )
                 agreed = "[AGREE]" in content
                 extracted = extract_spec(content)

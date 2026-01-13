@@ -69,6 +69,7 @@ You describe product --> Claude drafts spec --> Multiple LLMs critique in parall
 | Groq       | `GROQ_API_KEY`         | `groq/llama-3.3-70b-versatile`               |
 | OpenRouter | `OPENROUTER_API_KEY`   | `openrouter/openai/gpt-4o`, `openrouter/anthropic/claude-3.5-sonnet` |
 | Codex CLI  | ChatGPT subscription   | `codex/gpt-5.2-codex`, `codex/gpt-5.1-codex-max` |
+| Gemini CLI | Google account         | `gemini-cli/gemini-3-pro-preview`, `gemini-cli/gemini-3-flash-preview` |
 | Deepseek   | `DEEPSEEK_API_KEY`     | `deepseek/deepseek-chat`                     |
 | Zhipu      | `ZHIPUAI_API_KEY`      | `zhipu/glm-4`, `zhipu/glm-4-plus`            |
 
@@ -158,6 +159,30 @@ Higher reasoning effort produces more thorough analysis but uses more tokens.
 - `codex/gpt-5.1-codex-max` - GPT-5.1 Max via Codex CLI
 
 Check Codex CLI installation status:
+
+```bash
+python3 ~/.claude/skills/adversarial-spec/scripts/debate.py providers
+```
+
+## Gemini CLI Support
+
+[Gemini CLI](https://github.com/google-gemini/gemini-cli) allows Google account holders to use Gemini models without separate API credits. Models prefixed with `gemini-cli/` are routed through the Gemini CLI.
+
+**Setup:**
+
+```bash
+# Install Gemini CLI
+npm install -g @google/gemini-cli && gemini auth
+
+# Use Gemini CLI models (prefix with gemini-cli/)
+python3 debate.py critique --models gemini-cli/gemini-3-pro-preview < spec.md
+```
+
+**Available Gemini CLI models:**
+- `gemini-cli/gemini-3-pro-preview` - Gemini 3 Pro via CLI
+- `gemini-cli/gemini-3-flash-preview` - Gemini 3 Flash via CLI
+
+Check Gemini CLI installation status:
 
 ```bash
 python3 ~/.claude/skills/adversarial-spec/scripts/debate.py providers

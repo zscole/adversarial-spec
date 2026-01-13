@@ -13,6 +13,7 @@ from models import (
     CostTracker,
     ModelResponse,
     call_codex_model,
+    call_gemini_cli_model,
     call_models_parallel,
     call_single_model,
     detect_agreement,
@@ -670,6 +671,128 @@ class TestCallCodexModel:
         assert out == 0
 
 
+class TestCallGeminiCliModel:
+    @patch("models.GEMINI_CLI_AVAILABLE", False)
+    def test_raises_when_gemini_cli_unavailable(self):
+        import pytest
+
+        with pytest.raises(RuntimeError, match="Gemini CLI not found"):
+            call_gemini_cli_model("system", "user", "gemini-cli/gemini-3-pro-preview")
+
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_extracts_model_name_from_prefix(self, mock_run):
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout="Test response from Gemini",
+            stderr="",
+        )
+        response, inp, out = call_gemini_cli_model(
+            "sys", "user", "gemini-cli/gemini-3-pro-preview"
+        )
+        cmd = mock_run.call_args[0][0]
+        assert "gemini-3-pro-preview" in cmd
+        assert "gemini-cli/gemini-3-pro-preview" not in " ".join(cmd)
+
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_returns_response_text(self, mock_run):
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout="Test response from Gemini",
+            stderr="",
+        )
+        response, inp, out = call_gemini_cli_model(
+            "sys", "user", "gemini-cli/model"
+        )
+        assert response == "Test response from Gemini"
+
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_filters_noise_lines(self, mock_run):
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout="Loaded cached credentials.\nServer 'context7' supports...\nLoading extension: foo\nActual response",
+            stderr="",
+        )
+        response, inp, out = call_gemini_cli_model(
+            "sys", "user", "gemini-cli/model"
+        )
+        assert "Loaded cached" not in response
+        assert "Server " not in response
+        assert "Loading extension" not in response
+        assert "Actual response" in response
+
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_handles_nonzero_exit_code(self, mock_run):
+        import pytest
+
+        mock_run.return_value = Mock(returncode=1, stdout="", stderr="Some error")
+        with pytest.raises(RuntimeError, match="Gemini CLI failed"):
+            call_gemini_cli_model("sys", "user", "gemini-cli/model")
+
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_raises_on_empty_response(self, mock_run):
+        import pytest
+
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout="Loaded cached credentials.\nServer 'context7' supports...",
+            stderr="",
+        )
+        with pytest.raises(RuntimeError, match="No response from Gemini CLI"):
+            call_gemini_cli_model("sys", "user", "gemini-cli/model")
+
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_timeout_raises_runtime_error(self, mock_run):
+        import subprocess
+
+        import pytest
+
+        mock_run.side_effect = subprocess.TimeoutExpired("gemini", 600)
+        with pytest.raises(RuntimeError, match="timed out"):
+            call_gemini_cli_model("sys", "user", "gemini-cli/model")
+
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_file_not_found_raises_runtime_error(self, mock_run):
+        import pytest
+
+        mock_run.side_effect = FileNotFoundError()
+        with pytest.raises(RuntimeError, match="not found in PATH"):
+            call_gemini_cli_model("sys", "user", "gemini-cli/model")
+
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_estimates_tokens(self, mock_run):
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout="Response text here",
+            stderr="",
+        )
+        response, inp, out = call_gemini_cli_model(
+            "system prompt", "user message", "gemini-cli/model"
+        )
+        # Token estimation: len // 4
+        assert inp > 0
+        assert out > 0
+
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_uses_yolo_flag(self, mock_run):
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout="Response",
+            stderr="",
+        )
+        call_gemini_cli_model("sys", "user", "gemini-cli/model")
+        cmd = mock_run.call_args[0][0]
+        assert "-y" in cmd
+
+
 class TestCallSingleModel:
     @patch("models.completion")
     def test_returns_model_response_on_success(self, mock_completion):
@@ -892,6 +1015,48 @@ class TestCallSingleModel:
         ]
 
         call_single_model("codex/gpt-5", "spec", 1, "prd")
+        calls = mock_sleep.call_args_list
+        assert calls[0][0][0] == 1.0  # First delay
+        assert calls[1][0][0] == 2.0  # Second delay
+
+    @patch("models.call_gemini_cli_model")
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    def test_routes_gemini_cli_model_to_handler(self, mock_gemini):
+        mock_gemini.return_value = ("[AGREE]\n[SPEC]spec[/SPEC]", 100, 50)
+
+        result = call_single_model("gemini-cli/gemini-3-pro-preview", "spec", 1, "prd")
+        mock_gemini.assert_called_once()
+        assert result.model == "gemini-cli/gemini-3-pro-preview"
+
+    @patch("models.call_gemini_cli_model")
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    @patch("models.time.sleep")
+    def test_gemini_cli_retries_on_failure(self, mock_sleep, mock_gemini):
+        mock_gemini.side_effect = [Exception("First fail"), ("[AGREE]", 10, 5)]
+
+        result = call_single_model("gemini-cli/gemini-3-pro-preview", "spec", 1, "prd")
+        assert mock_gemini.call_count == 2
+        assert result.agreed is True
+
+    @patch("models.call_gemini_cli_model")
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    def test_gemini_cli_extracts_spec_from_response(self, mock_gemini):
+        mock_gemini.return_value = ("Critique\n[SPEC]Extracted spec[/SPEC]", 100, 50)
+
+        result = call_single_model("gemini-cli/gemini-3-pro-preview", "spec", 1, "prd")
+        assert result.spec == "Extracted spec"
+
+    @patch("models.call_gemini_cli_model")
+    @patch("models.GEMINI_CLI_AVAILABLE", True)
+    @patch("models.time.sleep")
+    def test_gemini_cli_exponential_backoff(self, mock_sleep, mock_gemini):
+        mock_gemini.side_effect = [
+            Exception("First fail"),
+            Exception("Second fail"),
+            ("[AGREE]", 10, 5),
+        ]
+
+        call_single_model("gemini-cli/gemini-3-pro-preview", "spec", 1, "prd")
         calls = mock_sleep.call_args_list
         assert calls[0][0][0] == 1.0  # First delay
         assert calls[1][0][0] == 2.0  # Second delay

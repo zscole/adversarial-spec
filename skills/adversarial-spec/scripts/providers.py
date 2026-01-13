@@ -37,12 +37,18 @@ MODEL_COSTS = {
     "codex/gpt-5.2-codex": {"input": 0.0, "output": 0.0},
     "codex/gpt-5.1-codex-max": {"input": 0.0, "output": 0.0},
     "codex/gpt-5.1-codex-mini": {"input": 0.0, "output": 0.0},
+    # Gemini CLI models (uses Google account, no per-token cost)
+    "gemini-cli/gemini-3-pro-preview": {"input": 0.0, "output": 0.0},
+    "gemini-cli/gemini-3-flash-preview": {"input": 0.0, "output": 0.0},
 }
 
 DEFAULT_COST = {"input": 5.00, "output": 15.00}
 
 # Check if Codex CLI is available
 CODEX_AVAILABLE = shutil.which("codex") is not None
+
+# Check if Gemini CLI is available
+GEMINI_CLI_AVAILABLE = shutil.which("gemini") is not None
 
 # Default reasoning effort for Codex CLI (minimal, low, medium, high, xhigh)
 DEFAULT_CODEX_REASONING = "xhigh"
@@ -309,6 +315,13 @@ def list_providers():
     print("             Install: npm install -g @openai/codex && codex login")
     print()
 
+    # Gemini CLI (uses Google account, not API key)
+    gemini_cli_status = "[installed]" if GEMINI_CLI_AVAILABLE else "[not installed]"
+    print(f"  {'Gemini CLI':12} {'(Google account)':24} {gemini_cli_status}")
+    print("             Example models: gemini-cli/gemini-3-pro-preview, gemini-cli/gemini-3-flash-preview")
+    print("             Install: npm install -g @google/gemini-cli && gemini auth")
+    print()
+
     # Show Bedrock option if not enabled
     if not bedrock_config.get("enabled"):
         print("AWS Bedrock:\n")
@@ -369,6 +382,10 @@ def get_available_providers() -> list[tuple[str, Optional[str], str]]:
     if CODEX_AVAILABLE:
         available.append(("Codex CLI", None, "codex/gpt-5.2-codex"))
 
+    # Add Gemini CLI if available
+    if GEMINI_CLI_AVAILABLE:
+        available.append(("Gemini CLI", None, "gemini-cli/gemini-3-pro-preview"))
+
     return available
 
 
@@ -426,12 +443,21 @@ def validate_model_credentials(models: list[str]) -> tuple[list[str], list[str]]
         "deepseek/": "DEEPSEEK_API_KEY",
         "zhipu/": "ZHIPUAI_API_KEY",
         "codex/": None,  # Uses ChatGPT subscription, not API key
+        "gemini-cli/": None,  # Uses Google account, not API key
     }
 
     for model in models:
         # Check if it's a Codex model
         if model.startswith("codex/"):
             if CODEX_AVAILABLE:
+                valid.append(model)
+            else:
+                invalid.append(model)
+            continue
+
+        # Check if it's a Gemini CLI model
+        if model.startswith("gemini-cli/"):
+            if GEMINI_CLI_AVAILABLE:
                 valid.append(model)
             else:
                 invalid.append(model)
