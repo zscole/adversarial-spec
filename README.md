@@ -15,6 +15,8 @@ claude plugin install adversarial-spec
 
 # 2. Set at least one API key
 export OPENAI_API_KEY="sk-..."
+# Or use OpenRouter for access to multiple providers with one key
+export OPENROUTER_API_KEY="sk-or-..."
 
 # 3. Run it
 /adversarial-spec "Build a rate limiter service with Redis backend"
@@ -57,15 +59,16 @@ You describe product --> Claude drafts spec --> Multiple LLMs critique in parall
 
 ## Supported Models
 
-| Provider  | Env Var              | Example Models                               |
-|-----------|----------------------|----------------------------------------------|
-| OpenAI    | `OPENAI_API_KEY`     | `gpt-4o`, `gpt-4-turbo`, `o1`                |
-| Google    | `GEMINI_API_KEY`     | `gemini/gemini-2.0-flash`, `gemini/gemini-pro` |
-| xAI       | `XAI_API_KEY`        | `xai/grok-3`, `xai/grok-beta`                |
-| Mistral   | `MISTRAL_API_KEY`    | `mistral/mistral-large`, `mistral/codestral` |
-| Groq      | `GROQ_API_KEY`       | `groq/llama-3.3-70b-versatile`               |
-| Deepseek  | `DEEPSEEK_API_KEY`   | `deepseek/deepseek-chat`                     |
-| Zhipu     | `ZHIPUAI_API_KEY`    | `zhipu/glm-4`, `zhipu/glm-4-plus`            |
+| Provider   | Env Var                | Example Models                               |
+|------------|------------------------|----------------------------------------------|
+| OpenAI     | `OPENAI_API_KEY`       | `gpt-4o`, `gpt-4-turbo`, `o1`                |
+| Google     | `GEMINI_API_KEY`       | `gemini/gemini-2.0-flash`, `gemini/gemini-pro` |
+| xAI        | `XAI_API_KEY`          | `xai/grok-3`, `xai/grok-beta`                |
+| Mistral    | `MISTRAL_API_KEY`      | `mistral/mistral-large`, `mistral/codestral` |
+| Groq       | `GROQ_API_KEY`         | `groq/llama-3.3-70b-versatile`               |
+| OpenRouter | `OPENROUTER_API_KEY`   | `openrouter/openai/gpt-4o`, `openrouter/anthropic/claude-3.5-sonnet` |
+| Deepseek   | `DEEPSEEK_API_KEY`     | `deepseek/deepseek-chat`                     |
+| Zhipu      | `ZHIPUAI_API_KEY`      | `zhipu/glm-4`, `zhipu/glm-4-plus`            |
 
 Check which keys are configured:
 
@@ -95,6 +98,33 @@ python3 ~/.claude/skills/adversarial-spec/scripts/debate.py bedrock disable
 When Bedrock is enabled, **all model calls route through Bedrock** - no direct API calls are made. Use friendly names like `claude-3-sonnet` which are automatically mapped to Bedrock model IDs.
 
 Configuration is stored at `~/.claude/adversarial-spec/config.json`.
+
+## OpenRouter Support
+
+[OpenRouter](https://openrouter.ai) provides unified access to multiple LLM providers through a single API. This is useful for:
+- Accessing models from multiple providers with one API key
+- Comparing models across different providers
+- Automatic fallback and load balancing
+- Cost optimization across providers
+
+**Setup:**
+
+```bash
+# Get your API key from https://openrouter.ai/keys
+export OPENROUTER_API_KEY="sk-or-..."
+
+# Use OpenRouter models (prefix with openrouter/)
+python3 debate.py critique --models openrouter/openai/gpt-4o,openrouter/anthropic/claude-3.5-sonnet < spec.md
+```
+
+**Popular OpenRouter models:**
+- `openrouter/openai/gpt-4o` - GPT-4o via OpenRouter
+- `openrouter/anthropic/claude-3.5-sonnet` - Claude 3.5 Sonnet
+- `openrouter/google/gemini-2.0-flash` - Gemini 2.0 Flash
+- `openrouter/meta-llama/llama-3.3-70b-instruct` - Llama 3.3 70B
+- `openrouter/qwen/qwen-2.5-72b-instruct` - Qwen 2.5 72B
+
+See the full model list at [openrouter.ai/models](https://openrouter.ai/models).
 
 ## OpenAI-Compatible Endpoints
 

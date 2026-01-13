@@ -21,15 +21,16 @@ Usage:
     python3 debate.py sessions
 
 Supported providers (set corresponding API key):
-    OpenAI:    OPENAI_API_KEY      models: gpt-4o, gpt-4-turbo, o1, etc.
-    Anthropic: ANTHROPIC_API_KEY   models: claude-sonnet-4-20250514, claude-opus-4-20250514, etc.
-    Google:    GEMINI_API_KEY      models: gemini/gemini-2.0-flash, gemini/gemini-pro, etc.
-    xAI:       XAI_API_KEY         models: xai/grok-3, xai/grok-beta, etc.
-    Mistral:   MISTRAL_API_KEY     models: mistral/mistral-large, etc.
-    Groq:      GROQ_API_KEY        models: groq/llama-3.3-70b, etc.
-    Codex CLI: (ChatGPT subscription) models: codex/gpt-5.2-codex, codex/gpt-5.1-codex-max
-               Install: npm install -g @openai/codex && codex login
-               Reasoning: --codex-reasoning xhigh (minimal, low, medium, high, xhigh)
+    OpenAI:     OPENAI_API_KEY       models: gpt-4o, gpt-4-turbo, o1, etc.
+    Anthropic:  ANTHROPIC_API_KEY    models: claude-sonnet-4-20250514, claude-opus-4-20250514, etc.
+    Google:     GEMINI_API_KEY       models: gemini/gemini-2.0-flash, gemini/gemini-pro, etc.
+    xAI:        XAI_API_KEY          models: xai/grok-3, xai/grok-beta, etc.
+    Mistral:    MISTRAL_API_KEY      models: mistral/mistral-large, etc.
+    Groq:       GROQ_API_KEY         models: groq/llama-3.3-70b, etc.
+    OpenRouter: OPENROUTER_API_KEY   models: openrouter/openai/gpt-4o, openrouter/anthropic/claude-3.5-sonnet, etc.
+    Codex CLI:  (ChatGPT subscription) models: codex/gpt-5.2-codex, codex/gpt-5.1-codex-max
+                Install: npm install -g @openai/codex && codex login
+                Reasoning: --codex-reasoning xhigh (minimal, low, medium, high, xhigh)
 
 Document types:
     prd   - Product Requirements Document (business/product focus)
