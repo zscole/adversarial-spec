@@ -37,6 +37,10 @@ MODEL_COSTS = {
     "codex/gpt-5.2-codex": {"input": 0.0, "output": 0.0},
     "codex/gpt-5.1-codex-max": {"input": 0.0, "output": 0.0},
     "codex/gpt-5.1-codex-mini": {"input": 0.0, "output": 0.0},
+    # Claude CLI models (uses Claude account, no per-token cost)
+    "claude-cli/sonnet": {"input": 0.0, "output": 0.0},
+    "claude-cli/opus": {"input": 0.0, "output": 0.0},
+    "claude-cli/haiku": {"input": 0.0, "output": 0.0},
     # Gemini CLI models (uses Google account, no per-token cost)
     "gemini-cli/gemini-3-pro-preview": {"input": 0.0, "output": 0.0},
     "gemini-cli/gemini-3-flash-preview": {"input": 0.0, "output": 0.0},
@@ -46,6 +50,9 @@ DEFAULT_COST = {"input": 5.00, "output": 15.00}
 
 # Check if Codex CLI is available
 CODEX_AVAILABLE = shutil.which("codex") is not None
+
+# Check if Claude CLI is available
+CLAUDE_CLI_AVAILABLE = shutil.which("claude") is not None
 
 # Check if Gemini CLI is available
 GEMINI_CLI_AVAILABLE = shutil.which("gemini") is not None
@@ -315,6 +322,13 @@ def list_providers():
     print("             Install: npm install -g @openai/codex && codex login")
     print()
 
+    # Claude CLI (uses Claude account, not API key)
+    claude_cli_status = "[installed]" if CLAUDE_CLI_AVAILABLE else "[not installed]"
+    print(f"  {'Claude CLI':12} {'(Claude account)':24} {claude_cli_status}")
+    print("             Example models: claude-cli/sonnet, claude-cli/opus")
+    print("             Install: npm install -g @anthropic-ai/claude-code && claude")
+    print()
+
     # Gemini CLI (uses Google account, not API key)
     gemini_cli_status = "[installed]" if GEMINI_CLI_AVAILABLE else "[not installed]"
     print(f"  {'Gemini CLI':12} {'(Google account)':24} {gemini_cli_status}")
@@ -384,6 +398,10 @@ def get_available_providers() -> list[tuple[str, Optional[str], str]]:
     if CODEX_AVAILABLE:
         available.append(("Codex CLI", None, "codex/gpt-5.2-codex"))
 
+    # Add Claude CLI if available
+    if CLAUDE_CLI_AVAILABLE:
+        available.append(("Claude CLI", None, "claude-cli/sonnet"))
+
     # Add Gemini CLI if available
     if GEMINI_CLI_AVAILABLE:
         available.append(("Gemini CLI", None, "gemini-cli/gemini-3-pro-preview"))
@@ -393,12 +411,12 @@ def get_available_providers() -> list[tuple[str, Optional[str], str]]:
 
 def get_default_model() -> Optional[str]:
     """
-    Get a default model based on available API keys.
+    Get a default model list based on available providers.
 
-    Checks Bedrock first, then API keys in priority order.
+    Checks Bedrock first, then prefers local CLI providers, then API keys.
 
     Returns:
-        Model name string, or None if no API keys are configured.
+        Comma-separated model list string, or None if no providers are configured.
     """
     # Check Bedrock first
     bedrock_config = get_bedrock_config()
@@ -406,6 +424,14 @@ def get_default_model() -> Optional[str]:
         available_models = bedrock_config.get("available_models", [])
         if available_models:
             return available_models[0]
+
+    default_models: list[str] = []
+    if CODEX_AVAILABLE:
+        default_models.append("codex/gpt-5.2-codex")
+    if CLAUDE_CLI_AVAILABLE:
+        default_models.append("claude-cli/sonnet")
+    if default_models:
+        return ",".join(default_models)
 
     # Check API keys
     available = get_available_providers()
@@ -445,6 +471,7 @@ def validate_model_credentials(models: list[str]) -> tuple[list[str], list[str]]
         "deepseek/": "DEEPSEEK_API_KEY",
         "zhipu/": "ZHIPUAI_API_KEY",
         "codex/": None,  # Uses ChatGPT subscription, not API key
+        "claude-cli/": None,  # Uses Claude account, not API key
         "gemini-cli/": None,  # Uses Google account, not API key
     }
 
@@ -452,6 +479,14 @@ def validate_model_credentials(models: list[str]) -> tuple[list[str], list[str]]
         # Check if it's a Codex model
         if model.startswith("codex/"):
             if CODEX_AVAILABLE:
+                valid.append(model)
+            else:
+                invalid.append(model)
+            continue
+
+        # Check if it's a Claude CLI model
+        if model.startswith("claude-cli/"):
+            if CLAUDE_CLI_AVAILABLE:
                 valid.append(model)
             else:
                 invalid.append(model)

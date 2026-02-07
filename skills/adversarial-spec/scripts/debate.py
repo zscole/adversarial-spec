@@ -31,6 +31,8 @@ Supported providers (set corresponding API key):
     Codex CLI:  (ChatGPT subscription) models: codex/gpt-5.2-codex, codex/gpt-5.1-codex-max
                 Install: npm install -g @openai/codex && codex login
                 Reasoning: --codex-reasoning xhigh (minimal, low, medium, high, xhigh)
+    Claude CLI: (Claude account)       models: claude-cli/sonnet, claude-cli/opus
+                Install: npm install -g @anthropic-ai/claude-code && claude
 
 Document types:
     prd   - Product Requirements Document (business/product focus)

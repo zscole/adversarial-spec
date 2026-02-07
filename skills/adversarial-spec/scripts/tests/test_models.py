@@ -12,6 +12,7 @@ from models import (
     RETRY_BASE_DELAY,
     CostTracker,
     ModelResponse,
+    call_claude_cli_model,
     call_codex_model,
     call_gemini_cli_model,
     call_models_parallel,
@@ -789,6 +790,92 @@ class TestCallGeminiCliModel:
         assert "-y" in cmd
 
 
+class TestCallClaudeCliModel:
+    @patch("models.CLAUDE_CLI_AVAILABLE", False)
+    def test_raises_when_claude_cli_unavailable(self):
+        import pytest
+
+        with pytest.raises(RuntimeError, match="Claude CLI not found"):
+            call_claude_cli_model("system", "user", "claude-cli/sonnet")
+
+    @patch("models.CLAUDE_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_extracts_model_name_from_prefix(self, mock_run):
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout="Test response from Claude",
+            stderr="",
+        )
+        response, inp, out = call_claude_cli_model(
+            "sys", "user", "claude-cli/sonnet"
+        )
+        cmd = mock_run.call_args[0][0]
+        assert "sonnet" in cmd
+        assert "claude-cli/sonnet" not in " ".join(cmd)
+
+    @patch("models.CLAUDE_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_returns_response_text(self, mock_run):
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout="Test response from Claude",
+            stderr="",
+        )
+        response, inp, out = call_claude_cli_model("sys", "user", "claude-cli/sonnet")
+        assert response == "Test response from Claude"
+
+    @patch("models.CLAUDE_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_handles_nonzero_exit_code(self, mock_run):
+        import pytest
+
+        mock_run.return_value = Mock(returncode=1, stdout="", stderr="Some error")
+        with pytest.raises(RuntimeError, match="Claude CLI failed"):
+            call_claude_cli_model("sys", "user", "claude-cli/sonnet")
+
+    @patch("models.CLAUDE_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_raises_on_empty_response(self, mock_run):
+        import pytest
+
+        mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
+        with pytest.raises(RuntimeError, match="No response from Claude CLI"):
+            call_claude_cli_model("sys", "user", "claude-cli/sonnet")
+
+    @patch("models.CLAUDE_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_timeout_raises_runtime_error(self, mock_run):
+        import subprocess
+        import pytest
+
+        mock_run.side_effect = subprocess.TimeoutExpired("claude", 600)
+        with pytest.raises(RuntimeError, match="timed out"):
+            call_claude_cli_model("sys", "user", "claude-cli/sonnet")
+
+    @patch("models.CLAUDE_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_file_not_found_raises_runtime_error(self, mock_run):
+        import pytest
+
+        mock_run.side_effect = FileNotFoundError()
+        with pytest.raises(RuntimeError, match="not found in PATH"):
+            call_claude_cli_model("sys", "user", "claude-cli/sonnet")
+
+    @patch("models.CLAUDE_CLI_AVAILABLE", True)
+    @patch("models.subprocess.run")
+    def test_estimates_tokens(self, mock_run):
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout="Response text here",
+            stderr="",
+        )
+        response, inp, out = call_claude_cli_model(
+            "system prompt", "user message", "claude-cli/sonnet"
+        )
+        assert inp > 0
+        assert out > 0
+
+
 class TestCallSingleModel:
     @patch("models.completion")
     def test_returns_model_response_on_success(self, mock_completion):
@@ -1053,6 +1140,48 @@ class TestCallSingleModel:
         ]
 
         call_single_model("gemini-cli/gemini-3-pro-preview", "spec", 1, "prd")
+        calls = mock_sleep.call_args_list
+        assert calls[0][0][0] == 1.0  # First delay
+        assert calls[1][0][0] == 2.0  # Second delay
+
+    @patch("models.call_claude_cli_model")
+    @patch("models.CLAUDE_CLI_AVAILABLE", True)
+    def test_routes_claude_cli_model_to_handler(self, mock_claude):
+        mock_claude.return_value = ("[AGREE]\n[SPEC]spec[/SPEC]", 100, 50)
+
+        result = call_single_model("claude-cli/sonnet", "spec", 1, "prd")
+        mock_claude.assert_called_once()
+        assert result.model == "claude-cli/sonnet"
+
+    @patch("models.call_claude_cli_model")
+    @patch("models.CLAUDE_CLI_AVAILABLE", True)
+    @patch("models.time.sleep")
+    def test_claude_cli_retries_on_failure(self, mock_sleep, mock_claude):
+        mock_claude.side_effect = [Exception("First fail"), ("[AGREE]", 10, 5)]
+
+        result = call_single_model("claude-cli/sonnet", "spec", 1, "prd")
+        assert mock_claude.call_count == 2
+        assert result.agreed is True
+
+    @patch("models.call_claude_cli_model")
+    @patch("models.CLAUDE_CLI_AVAILABLE", True)
+    def test_claude_cli_extracts_spec_from_response(self, mock_claude):
+        mock_claude.return_value = ("Critique\n[SPEC]Extracted spec[/SPEC]", 100, 50)
+
+        result = call_single_model("claude-cli/sonnet", "spec", 1, "prd")
+        assert result.spec == "Extracted spec"
+
+    @patch("models.call_claude_cli_model")
+    @patch("models.CLAUDE_CLI_AVAILABLE", True)
+    @patch("models.time.sleep")
+    def test_claude_cli_exponential_backoff(self, mock_sleep, mock_claude):
+        mock_claude.side_effect = [
+            Exception("First fail"),
+            Exception("Second fail"),
+            ("[AGREE]", 10, 5),
+        ]
+
+        call_single_model("claude-cli/sonnet", "spec", 1, "prd")
         calls = mock_sleep.call_args_list
         assert calls[0][0][0] == 1.0  # First delay
         assert calls[1][0][0] == 2.0  # Second delay

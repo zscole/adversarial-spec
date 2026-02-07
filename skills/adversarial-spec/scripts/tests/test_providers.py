@@ -475,6 +475,22 @@ class TestListProviders:
                         assert "Codex CLI" in output
                         assert "[installed]" in output
 
+    def test_shows_claude_cli_status(self):
+        from io import StringIO
+
+        from providers import list_providers
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.json"
+
+            with patch("providers.GLOBAL_CONFIG_PATH", config_path):
+                with patch("providers.CLAUDE_CLI_AVAILABLE", True):
+                    with patch("sys.stdout", new_callable=StringIO) as mock_out:
+                        list_providers()
+                        output = mock_out.getvalue()
+                        assert "Claude CLI" in output
+                        assert "[installed]" in output
+
 
 class TestListFocusAreas:
     """Tests for list_focus_areas function.
@@ -738,25 +754,42 @@ class TestGetAvailableProviders:
 
         with patch.dict("os.environ", {}, clear=True):
             with patch("providers.CODEX_AVAILABLE", True):
-                with patch("providers.GEMINI_CLI_AVAILABLE", False):
-                    available = get_available_providers()
-                    provider_names = [name for name, _, _ in available]
-                    assert "Codex CLI" in provider_names
+                with patch("providers.CLAUDE_CLI_AVAILABLE", False):
+                    with patch("providers.GEMINI_CLI_AVAILABLE", False):
+                        available = get_available_providers()
+                        provider_names = [name for name, _, _ in available]
+                        assert "Codex CLI" in provider_names
+
+    def test_includes_claude_cli_when_available(self):
+        from providers import get_available_providers
+
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("providers.CODEX_AVAILABLE", False):
+                with patch("providers.CLAUDE_CLI_AVAILABLE", True):
+                    with patch("providers.GEMINI_CLI_AVAILABLE", False):
+                        available = get_available_providers()
+                        provider_names = [name for name, _, _ in available]
+                        assert "Claude CLI" in provider_names
+                        for name, key, model in available:
+                            if name == "Claude CLI":
+                                assert model == "claude-cli/sonnet"
+                                assert key is None
 
     def test_includes_gemini_cli_when_available(self):
         from providers import get_available_providers
 
         with patch.dict("os.environ", {}, clear=True):
             with patch("providers.CODEX_AVAILABLE", False):
-                with patch("providers.GEMINI_CLI_AVAILABLE", True):
-                    available = get_available_providers()
-                    provider_names = [name for name, _, _ in available]
-                    assert "Gemini CLI" in provider_names
-                    # Verify the default model for Gemini CLI
-                    for name, key, model in available:
-                        if name == "Gemini CLI":
-                            assert model == "gemini-cli/gemini-3-pro-preview"
-                            assert key is None  # No API key required
+                with patch("providers.CLAUDE_CLI_AVAILABLE", False):
+                    with patch("providers.GEMINI_CLI_AVAILABLE", True):
+                        available = get_available_providers()
+                        provider_names = [name for name, _, _ in available]
+                        assert "Gemini CLI" in provider_names
+                        # Verify the default model for Gemini CLI
+                        for name, key, model in available:
+                            if name == "Gemini CLI":
+                                assert model == "gemini-cli/gemini-3-pro-preview"
+                                assert key is None  # No API key required
 
 
 class TestGetDefaultModel:
@@ -764,17 +797,31 @@ class TestGetDefaultModel:
         from providers import get_default_model
 
         with patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"}, clear=True):
-            default = get_default_model()
-            assert default == "gemini/gemini-2.0-flash"
+            with patch("providers.CODEX_AVAILABLE", False):
+                with patch("providers.CLAUDE_CLI_AVAILABLE", False):
+                    with patch("providers.GEMINI_CLI_AVAILABLE", False):
+                        default = get_default_model()
+                        assert default == "gemini/gemini-2.0-flash"
 
     def test_returns_none_when_no_keys(self):
         from providers import get_default_model
 
         with patch.dict("os.environ", {}, clear=True):
             with patch("providers.CODEX_AVAILABLE", False):
-                with patch("providers.GEMINI_CLI_AVAILABLE", False):
-                    default = get_default_model()
-                    assert default is None
+                with patch("providers.CLAUDE_CLI_AVAILABLE", False):
+                    with patch("providers.GEMINI_CLI_AVAILABLE", False):
+                        default = get_default_model()
+                        assert default is None
+
+    def test_prefers_cli_defaults_when_available(self):
+        from providers import get_default_model
+
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("providers.CODEX_AVAILABLE", True):
+                with patch("providers.CLAUDE_CLI_AVAILABLE", True):
+                    with patch("providers.GEMINI_CLI_AVAILABLE", False):
+                        default = get_default_model()
+                        assert default == "codex/gpt-5.2-codex,claude-cli/sonnet"
 
     def test_prefers_bedrock_when_enabled(self):
         from providers import get_default_model
