@@ -34,6 +34,7 @@ MODEL_COSTS = {
     "zhipu/glm-4": {"input": 1.40, "output": 1.40},
     "zhipu/glm-4-plus": {"input": 7.00, "output": 7.00},
     # Codex CLI models (uses ChatGPT subscription, no per-token cost)
+    "codex/gpt-5.3-codex": {"input": 0.0, "output": 0.0},
     "codex/gpt-5.2-codex": {"input": 0.0, "output": 0.0},
     "codex/gpt-5.1-codex-max": {"input": 0.0, "output": 0.0},
     "codex/gpt-5.1-codex-mini": {"input": 0.0, "output": 0.0},
@@ -308,7 +309,7 @@ def list_providers():
     # Codex CLI (uses ChatGPT subscription, not API key)
     codex_status = "[installed]" if CODEX_AVAILABLE else "[not installed]"
     print(f"  {'Codex CLI':12} {'(ChatGPT subscription)':24} {codex_status}")
-    print("             Example models: codex/gpt-5.2-codex, codex/gpt-5.1-codex-max")
+    print("             Example models: codex/gpt-5.3-codex, codex/gpt-5.2-codex")
     print(
         "             Reasoning: --codex-reasoning (minimal, low, medium, high, xhigh)"
     )
@@ -382,7 +383,7 @@ def get_available_providers() -> list[tuple[str, Optional[str], str]]:
 
     # Add Codex CLI if available
     if CODEX_AVAILABLE:
-        available.append(("Codex CLI", None, "codex/gpt-5.2-codex"))
+        available.append(("Codex CLI", None, "codex/gpt-5.3-codex"))
 
     # Add Gemini CLI if available
     if GEMINI_CLI_AVAILABLE:

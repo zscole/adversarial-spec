@@ -102,6 +102,13 @@ class TestCostTracker:
         assert tracker.total_cost == 0.0  # Must be exactly 0.0
         assert tracker.by_model == {}
 
+    def test_codex_gpt53_zero_cost(self):
+        tracker = CostTracker()
+        cost = tracker.add("codex/gpt-5.3-codex", 10000, 5000)
+        # Codex CLI models have $0 per-token cost
+        assert cost == 0.0
+        assert tracker.total_cost == 0.0
+
     def test_tracks_by_model(self):
         tracker = CostTracker()
         tracker.add("gpt-4o", 1000, 500)
@@ -542,6 +549,22 @@ class TestCallCodexModel:
 
     @patch("models.CODEX_AVAILABLE", True)
     @patch("models.subprocess.run")
+    def test_extracts_gpt53_codex_model_name(self, mock_run):
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout='{"type":"item.completed","item":{"type":"agent_message","text":"Response"}}\n{"type":"turn.completed","usage":{"input_tokens":200,"output_tokens":100}}',
+            stderr="",
+        )
+        response, inp, out = call_codex_model("sys", "user", "codex/gpt-5.3-codex")
+        cmd = mock_run.call_args[0][0]
+        assert "gpt-5.3-codex" in cmd
+        assert "codex/gpt-5.3-codex" not in cmd
+        assert response == "Response"
+        assert inp == 200
+        assert out == 100
+
+    @patch("models.CODEX_AVAILABLE", True)
+    @patch("models.subprocess.run")
     def test_parses_jsonl_response(self, mock_run):
         mock_run.return_value = Mock(
             returncode=0,
@@ -979,6 +1002,17 @@ class TestCallSingleModel:
         result = call_single_model("codex/gpt-5", "spec", 1, "prd")
         mock_codex.assert_called_once()
         assert result.model == "codex/gpt-5"
+
+    @patch("models.call_codex_model")
+    @patch("models.CODEX_AVAILABLE", True)
+    def test_routes_gpt53_codex_to_handler(self, mock_codex):
+        mock_codex.return_value = ("[AGREE]\n[SPEC]spec[/SPEC]", 200, 100)
+
+        result = call_single_model("codex/gpt-5.3-codex", "spec", 1, "prd")
+        mock_codex.assert_called_once()
+        assert result.model == "codex/gpt-5.3-codex"
+        assert result.agreed is True
+        assert result.spec == "spec"
 
     @patch("models.call_codex_model")
     @patch("models.CODEX_AVAILABLE", True)

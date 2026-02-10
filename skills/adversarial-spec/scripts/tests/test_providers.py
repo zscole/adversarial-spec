@@ -32,6 +32,7 @@ class TestModelCosts:
             "mistral/mistral-large",
             "deepseek/deepseek-chat",
             "zhipu/glm-4",
+            "codex/gpt-5.3-codex",
         ]
         for model in expected:
             assert model in MODEL_COSTS
@@ -742,6 +743,11 @@ class TestGetAvailableProviders:
                     available = get_available_providers()
                     provider_names = [name for name, _, _ in available]
                     assert "Codex CLI" in provider_names
+                    # Verify the default model is gpt-5.3-codex
+                    for name, key, model in available:
+                        if name == "Codex CLI":
+                            assert model == "codex/gpt-5.3-codex"
+                            assert key is None
 
     def test_includes_gemini_cli_when_available(self):
         from providers import get_available_providers
@@ -836,6 +842,19 @@ class TestValidateModelCredentials:
             valid, invalid = validate_model_credentials(["codex/gpt-5.2-codex"])
             assert valid == []
             assert invalid == ["codex/gpt-5.2-codex"]
+
+    def test_validates_codex_gpt53_availability(self):
+        from providers import validate_model_credentials
+
+        with patch("providers.CODEX_AVAILABLE", True):
+            valid, invalid = validate_model_credentials(["codex/gpt-5.3-codex"])
+            assert valid == ["codex/gpt-5.3-codex"]
+            assert invalid == []
+
+        with patch("providers.CODEX_AVAILABLE", False):
+            valid, invalid = validate_model_credentials(["codex/gpt-5.3-codex"])
+            assert valid == []
+            assert invalid == ["codex/gpt-5.3-codex"]
 
     def test_validates_gemini_cli_availability(self):
         from providers import validate_model_credentials
