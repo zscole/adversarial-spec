@@ -30,12 +30,12 @@ Generate and refine specifications through iterative debate with multiple LLMs u
 | OpenRouter | `OPENROUTER_API_KEY`   | `openrouter/openai/gpt-4o`, `openrouter/anthropic/claude-3.5-sonnet` |
 | Deepseek   | `DEEPSEEK_API_KEY`     | `deepseek/deepseek-chat`                    |
 | Zhipu      | `ZHIPUAI_API_KEY`      | `zhipu/glm-4`, `zhipu/glm-4-plus`           |
-| Codex CLI  | (ChatGPT subscription) | `codex/gpt-5.2-codex`, `codex/gpt-5.1-codex-max` |
+| Codex CLI  | (ChatGPT subscription) | `codex/gpt-5.3-codex`, `codex/gpt-5.2-codex` |
 | Gemini CLI | (Google account)       | `gemini-cli/gemini-3-pro-preview`, `gemini-cli/gemini-3-flash-preview` |
 
 **Codex CLI Setup:**
 - Install: `npm install -g @openai/codex && codex login`
-- Reasoning effort: `--codex-reasoning` (minimal, low, medium, high, xhigh)
+- Reasoning effort: `--codex-reasoning` (low, medium, high, xhigh). Default: `xhigh` for thorough spec analysis. Codex model default is `medium`.
 - Web search: `--codex-search` (enables web search for current information)
 
 **Gemini CLI Setup:**
@@ -340,7 +340,7 @@ Then present available models to the user using AskUserQuestion with multiSelect
 - `zhipu/glm-4-plus` - Enhanced GLM model
 
 **If Codex CLI is installed, include:**
-- `codex/gpt-5.2-codex` - OpenAI Codex with extended reasoning
+- `codex/gpt-5.3-codex` - OpenAI Codex with extended reasoning
 
 **If Gemini CLI is installed, include:**
 - `gemini-cli/gemini-3-pro-preview` - Google Gemini 3 Pro

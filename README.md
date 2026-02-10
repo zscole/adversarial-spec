@@ -68,7 +68,7 @@ You describe product --> Claude drafts spec --> Multiple LLMs critique in parall
 | Mistral    | `MISTRAL_API_KEY`      | `mistral/mistral-large`, `mistral/codestral` |
 | Groq       | `GROQ_API_KEY`         | `groq/llama-3.3-70b-versatile`               |
 | OpenRouter | `OPENROUTER_API_KEY`   | `openrouter/openai/gpt-4o`, `openrouter/anthropic/claude-3.5-sonnet` |
-| Codex CLI  | ChatGPT subscription   | `codex/gpt-5.2-codex`, `codex/gpt-5.1-codex-max` |
+| Codex CLI  | ChatGPT subscription   | `codex/gpt-5.3-codex`, `codex/gpt-5.2-codex` |
 | Gemini CLI | Google account         | `gemini-cli/gemini-3-pro-preview`, `gemini-cli/gemini-3-flash-preview` |
 | Deepseek   | `DEEPSEEK_API_KEY`     | `deepseek/deepseek-chat`                     |
 | Zhipu      | `ZHIPUAI_API_KEY`      | `zhipu/glm-4`, `zhipu/glm-4-plus`            |
@@ -140,7 +140,7 @@ See the full model list at [openrouter.ai/models](https://openrouter.ai/models).
 npm install -g @openai/codex
 
 # Use Codex models (prefix with codex/)
-python3 debate.py critique --models codex/gpt-5.2-codex,gemini/gemini-2.0-flash < spec.md
+python3 debate.py critique --models codex/gpt-5.3-codex,gemini/gemini-2.0-flash < spec.md
 ```
 
 **Reasoning effort:**
@@ -149,14 +149,21 @@ Control how much thinking time the model uses with `--codex-reasoning`:
 
 ```bash
 # Available levels: low, medium, high, xhigh (default: xhigh)
-python3 debate.py critique --models codex/gpt-5.2-codex --codex-reasoning high < spec.md
+python3 debate.py critique --models codex/gpt-5.3-codex --codex-reasoning high < spec.md
 ```
 
-Higher reasoning effort produces more thorough analysis but uses more tokens.
+| Level    | Description                                       |
+|----------|---------------------------------------------------|
+| `low`    | Fast responses with lighter reasoning              |
+| `medium` | Balances speed and reasoning depth (Codex default) |
+| `high`   | Greater reasoning depth for complex problems       |
+| `xhigh`  | Extra high reasoning depth (adversarial-spec default) |
+
+The plugin defaults to `xhigh` because adversarial spec review benefits from thorough, deep analysis. Use `medium` or `high` for faster iterations.
 
 **Available Codex models:**
+- `codex/gpt-5.3-codex` - GPT-5.3 via Codex CLI
 - `codex/gpt-5.2-codex` - GPT-5.2 via Codex CLI
-- `codex/gpt-5.1-codex-max` - GPT-5.1 Max via Codex CLI
 
 Check Codex CLI installation status:
 

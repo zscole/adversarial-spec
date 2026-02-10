@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- New `codex/gpt-5.3-codex` model support for Codex CLI (ChatGPT subscription)
+- Updated default Codex CLI model from `gpt-5.2-codex` to `gpt-5.3-codex`
+
 ### Fixed
 
 - Added `--skip-git-repo-check` flag to Codex CLI calls for non-git directory support

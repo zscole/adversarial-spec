@@ -6,7 +6,7 @@ Sends specs to multiple LLMs for critique using LiteLLM.
 Usage:
     echo "spec" | python3 debate.py critique --models gpt-4o
     echo "spec" | python3 debate.py critique --models gpt-4o,gemini/gemini-2.0-flash,xai/grok-3 --doc-type prd
-    echo "spec" | python3 debate.py critique --models codex/gpt-5.2-codex,gemini/gemini-2.0-flash --doc-type tech
+    echo "spec" | python3 debate.py critique --models codex/gpt-5.3-codex,gemini/gemini-2.0-flash --doc-type tech
     echo "spec" | python3 debate.py critique --models gpt-4o --focus security
     echo "spec" | python3 debate.py critique --models gpt-4o --persona "security engineer"
     echo "spec" | python3 debate.py critique --models gpt-4o --context ./api.md --context ./schema.sql
@@ -28,7 +28,7 @@ Supported providers (set corresponding API key):
     Mistral:    MISTRAL_API_KEY      models: mistral/mistral-large, etc.
     Groq:       GROQ_API_KEY         models: groq/llama-3.3-70b, etc.
     OpenRouter: OPENROUTER_API_KEY   models: openrouter/openai/gpt-4o, openrouter/anthropic/claude-3.5-sonnet, etc.
-    Codex CLI:  (ChatGPT subscription) models: codex/gpt-5.2-codex, codex/gpt-5.1-codex-max
+    Codex CLI:  (ChatGPT subscription) models: codex/gpt-5.3-codex, codex/gpt-5.2-codex
                 Install: npm install -g @openai/codex && codex login
                 Reasoning: --codex-reasoning xhigh (minimal, low, medium, high, xhigh)
 
